@@ -53,9 +53,13 @@ Python 3.8+
 pip install -r requirements.txt (if you have one; otherwise manually install):
 
   requests (for ingestion)
+  
   openpyxl (for Excel)
+  
   boto3 (if cloud upload to S3)
+  
   pytest (if you want to run tests)
+  
 
 Ensure the script is run from the project root so it can find raw_data/ and geonames.csv.
 
@@ -73,14 +77,19 @@ Ensure the script is run from the project root so it can find raw_data/ and geon
 
 4. Check the final results:
   final_output.csv → aggregated monthly table with yoy differences.
+
   transform_data_quality.xlsx → any data issues found.
+  
   raw_data/ → raw downloads (unmodified).
 
 
 # Data Quality Checks
   • Null Checks: Finds rows where temp_c is null or year/month is missing.
+  
   • Outlier Checks: Flags if temp_c < -50 or temp_c > 50.
+  
   • Missing Days: If actual row count < 80% of the expected (days_in_month * 24), it flags coverage issues.
+  
 
 
 # Testing
@@ -89,12 +98,19 @@ We have a tests/ folder, you can run:
 
 # Known Limitations
   • If the source CSV from Environment Canada is empty (no temperature columns), you’ll see many “NO_VALID_TEMP” or “NULL_VALUES” warnings.
+  
   • The final join with geonames.csv may fail to match lat/lon exactly, leading to null feature_id or map.
+  
   • YOY difference is only meaningful if data for the same month in the previous year exists.
 
 # Future Enhancements
 • Incremental ingestion (only fetch new days).
+
 • Partitioned raw data (e.g. raw_data/2023/01/station_31688.csv).
+
 • Logging to a file rather than Excel-based checks.
+
 • Orchestration with Airflow or Luigi.
+
 • Testing more components with unit tests.
+
