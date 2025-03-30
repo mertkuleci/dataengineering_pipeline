@@ -15,41 +15,36 @@ This project demonstrates a data engineering pipeline that:
 
 5. Outputs the final monthly table to a CSV (final_output.csv) and logs quality issues to an Excel file (transform_data_quality.xlsx).
 
-# Folder Structure:
-
-dataengineering_pipeline/
-  ├── ingest.py                         # Python script for data extraction
-  ├── transform.py                      # Python script for data transformation & quality checks
-  ├── geonames.csv                      # Provided dimension table
-  ├── raw_data/                         # Folder for raw downloaded CSVs
-  ├── final_output.csv                  # Final aggregated dataset (output)
-  ├── transform_data_quality.xlsx       # Data quality report after transformation
-  ├── weather_db.sqlite                 # SQLite DB file (optional, created during transform)
-  ├── (optional) run_pipeline.sh        # Example shell script to run everything
-  ├── tests/                            # Folder for unit tests (if included)
-  │   └── test_transform.py             # Example pytest tests
-  └── README.md                         # This documentation file
-
-  
 # Data Flow / Architecture
 
 ## 1. ingest.py
 
   • Loops over station IDs [26953, 31688], years [2023, 2024], months [1..12].
+  
   • Builds a dynamic URL (e.g. https://climate.weather.gc.ca/...).
+  
   • Downloads each CSV and saves unmodified to raw_data/.
 
 ## 2. transform.py
 
   • Creates (or resets) a local SQLite DB (weather_db.sqlite).
+  
   • Loads geonames.csv into geonames_dim.
+  
   • Loads all weather_station_*.csv from raw_data/ into weather_raw.
+  
   • Checks for nulls, outliers, missing coverage (via SQL). Records issues in data_quality_issues.
+  
   • Cleans the data (removes rows with invalid year or temperature).
+  
   • Aggregates monthly stats in monthly_agg, calculates YOY difference in monthly_agg_yoy.
+  
   • Joins geonames_dim to produce final_data.
+  
   • Exports final_data to final_output.csv.
+  
   • Writes all data quality issues to transform_data_quality.xlsx.
+  
 
 # Setup & Requirements
 
