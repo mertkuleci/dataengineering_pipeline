@@ -1,116 +1,106 @@
-# Project Title
-Buluttan Data Engineer Intern Technical Assessment
+### Project Title
+**Buluttan Data Engineer Intern Technical Assessment**
 
-# Overview
-This project demonstrates a data engineering pipeline that:
+### Overview
+This project demonstrates a **data engineering pipeline** that:
 
-1. Extracts weather data (hourly temperature observations) for 2023 and 2024 from Environment Canada’s bulk_data_e endpoint (for two stations: 26953 and 31688).
-2. Checks for data quality issues (nulls, outliers, missing days).
-3. Stores the raw data in CSV format under the raw_data/ folder.
-4. Transforms the data by loading it into SQLite:
-  • Cleans invalid rows (e.g., null or out-of-range temps).
-  • Aggregates monthly stats (average, min, max).
-  • Computes year-over-year (yoy) average temperature deltas.
-  • Joins with geonames.csv to fetch feature_id and map.
+1. **Extracts** weather data (hourly temperature observations) for **2023 and 2024** from Environment Canada’s bulk_data_e endpoint (for stations **26953** and **31688**).
+2. **Performs** data quality checks (nulls, outliers, missing days).
+3. **Stores** the raw data in CSV format under the **raw_data/** folder.
+4. **Transforms** the data by loading it into **SQLite**:
+   - Cleans invalid rows (e.g., null or out-of-range temps).
+   - Aggregates monthly stats (avg, min, max).
+   - Computes year-over-year (yoy) average temperature deltas.
+   - Joins with geonames.csv to fetch **feature_id** and **map**.
+   - Uses **external SQL files** (in a sql/ folder) to run queries.
+   - Logs progress with **logging** instead of print statements.
+5. **Outputs** the final monthly table to:
+   - **final_output.csv** (and also .json and .parquet)
+   - Logs quality issues into **transform_data_quality.xlsx** (and also .json and .parquet)
 
-5. Outputs the final monthly table to a CSV (final_output.csv) and logs quality issues to an Excel file (transform_data_quality.xlsx).
+### Data Flow / Architecture
 
-# Data Flow / Architecture
+#### 1. ingest.py
+- Iterates over station IDs `[26953, 31688]`, years `[2023, 2024]`, and months `[1..12]`.
+- Builds a dynamic URL (e.g. https://climate.weather.gc.ca/...).
+- Downloads each CSV, saves them unmodified to **raw_data/**.
+- Logs progress via **logging** messages.
 
-## 1. ingest.py
+#### 2. transform.py
+- Creates (or resets) a local SQLite DB named **weather_db.sqlite**.
+- Loads **geonames.csv** into **geonames_dim**.
+- Loads all **weather_station_*.csv** from **raw_data/** into **weather_raw**.
+- Reads and executes SQL scripts (`create_tables.sql`, `monthly_agg.sql`, `yoy_diff.sql`, `final_data.sql`) from a **sql/** folder.
+- Checks for nulls, outliers, and missing coverage (via SQL). Records these issues in memory and finally writes them out in multiple formats (Excel, JSON, Parquet).
+- Cleans the data by removing invalid rows (bad year, out-of-range temp).
+- Aggregates monthly stats in `monthly_agg`, calculates YOY difference in `monthly_agg_yoy`.
+- Joins geonames_dim to produce `final_data`.
+- Writes `final_output.csv` (plus .json and .parquet).
+- Writes all data quality issues to **transform_data_quality.xlsx**, plus JSON and Parquet equivalents.
+- Uses **logging** for status and error messages.
 
-  • Loops over station IDs [26953, 31688], years [2023, 2024], months [1..12].
-  
-  • Builds a dynamic URL (e.g. https://climate.weather.gc.ca/...).
-  
-  • Downloads each CSV and saves unmodified to raw_data/.
+### Setup & Requirements
+- **Python 3.8+**
 
-## 2. transform.py
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+Which may include:
+- `requests`
+- `openpyxl`
+- `pandas`, `pyarrow` (for JSON/Parquet output)
+- `pytest` (for testing)
+- `logging` (built-in, no separate install)
 
-  • Creates (or resets) a local SQLite DB (weather_db.sqlite).
-  
-  • Loads geonames.csv into geonames_dim.
-  
-  • Loads all weather_station_*.csv from raw_data/ into weather_raw.
-  
-  • Checks for nulls, outliers, missing coverage (via SQL). Records issues in data_quality_issues.
-  
-  • Cleans the data (removes rows with invalid year or temperature).
-  
-  • Aggregates monthly stats in monthly_agg, calculates YOY difference in monthly_agg_yoy.
-  
-  • Joins geonames_dim to produce final_data.
-  
-  • Exports final_data to final_output.csv.
-  
-  • Writes all data quality issues to transform_data_quality.xlsx.
-  
+Make sure to run scripts from the project root so they can find `raw_data/`, `sql/`, and `geonames.csv`.
 
-# Setup & Requirements
+### Usage
 
-Python 3.8+
+1. **Clone** or download this repository.
+2. **Run ingestion**:
+   ```bash
+   python ingest.py
+   ```
+   - Creates `raw_data/` folder, fetches monthly CSV for 26953 & 31688 (2023–2024).
+   - Logs progress.
 
-pip install -r requirements.txt (if you have one; otherwise manually install):
+3. **Run transformation**:
+   ```bash
+   python transform.py
+   ```
+   - Builds `weather_db.sqlite`.
+   - Executes external SQL scripts.
+   - Logs data quality issues to `transform_data_quality.*` (Excel, JSON, Parquet).
+   - Writes final monthly aggregates to `final_output.*` (CSV, JSON, Parquet).
 
-  requests (for ingestion)
-  
-  openpyxl (for Excel)
-  
-  boto3 (if cloud upload to S3)
-  
-  pytest (if you want to run tests)
-  
+4. **Check**:
+   - `final_output.csv` → aggregated monthly table with YOY differences.
+   - `transform_data_quality.xlsx` → data issues found.
+   - Additional formats: `final_output.json`, `final_output.parquet`, `transform_data_quality.json`, `transform_data_quality.parquet`.
+   - `raw_data/` → raw CSV files.
 
-Ensure the script is run from the project root so it can find raw_data/ and geonames.csv.
+### Data Quality Checks
+- **Null Checks**: Finds rows where `temp_c` is null or year/month is missing.  
+- **Outlier Checks**: Flags if `temp_c` < -50 or `temp_c` > 50.  
+- **Missing Days**: Coverage <80% calculated as `(row_count / (days_in_month * 24)) < 0.8`.
 
-# Usage
-1. Clone or download this repository.
+### Testing
+There is a `test_transform.py`:
+```bash
+pytest
+```
+- Basic tests for transformation and data integrity.
 
-2. Run ingestion:
-  python ingest.py
+### Known Limitations
+- If Environment Canada’s CSV has no temperature data, expect “NO_VALID_TEMP” or “NULL_VALUES” warnings.
+- The join to geonames.csv may fail if lat/long don't match exactly → `feature_id`/`map` might be null.
+- YOY difference only works if prior year’s data is available.
 
-    This creates raw_data/ folder and saves monthly CSVs for station IDs 26953 and 31688, years 2023–2024.
-
-3. Run transformation:
-  python transform.py
-    This creates/updates weather_db.sqlite, logs issues to transform_data_quality.xlsx, and writes final_output.csv.
-
-4. Check the final results:
-  final_output.csv → aggregated monthly table with yoy differences.
-
-  transform_data_quality.xlsx → any data issues found.
-  
-  raw_data/ → raw downloads (unmodified).
-
-
-# Data Quality Checks
-  • Null Checks: Finds rows where temp_c is null or year/month is missing.
-  
-  • Outlier Checks: Flags if temp_c < -50 or temp_c > 50.
-  
-  • Missing Days: If actual row count < 80% of the expected (days_in_month * 24), it flags coverage issues.
-  
-
-
-# Testing
-We have a tests/ folder, you can run:
-  pytest
-
-# Known Limitations
-  • If the source CSV from Environment Canada is empty (no temperature columns), you’ll see many “NO_VALID_TEMP” or “NULL_VALUES” warnings.
-  
-  • The final join with geonames.csv may fail to match lat/lon exactly, leading to null feature_id or map.
-  
-  • YOY difference is only meaningful if data for the same month in the previous year exists.
-
-# Future Enhancements
-• Incremental ingestion (only fetch new days).
-
-• Partitioned raw data (e.g. raw_data/2023/01/station_31688.csv).
-
-• Logging to a file rather than Excel-based checks.
-
-• Orchestration with Airflow or Luigi.
-
-• Testing more components with unit tests.
+### Future Enhancements
+- **Incremental ingestion** (fetch only new data).
+- **Partitioned raw data** (e.g. `raw_data/2023/01/station_31688.csv`).
+- **Logging to file** instead of only console.
+- **Orchestration** with Airflow or Luigi.
+- **Expanded testing** for more robust coverage.
 
